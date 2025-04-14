@@ -86,8 +86,11 @@ const formDetailsSchema = new mongoose.Schema({
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  resetOTP: String,
+  otpExpiry: Date,  
   formDetails: [formDetailsSchema]
 });
+
 
 const User = mongoose.model('User', userSchema);
 

@@ -1,6 +1,67 @@
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Set OTP and expiry (valid for 10 mins)
+    user.resetOTP = otp;
+    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    // Setup transporter (use your email credentials here)
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'fromelevate@gmail.com',
+        pass: 'qopm smzk ixkn avvi', // Use App Password
+      },
+    });
+
+    const mailOptions = {
+      from: 'fromelevate@gmail.com',
+      to: email,
+      subject: 'Password Reset OTP',
+      text: `Your OTP to reset password is: ${otp}`,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ message: 'OTP sent to email successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.resetOTP !== otp || new Date() > user.otpExpiry) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetOTP = null;
+    user.otpExpiry = null;
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // Register User
 exports.registerUser = async (req, res) => {
